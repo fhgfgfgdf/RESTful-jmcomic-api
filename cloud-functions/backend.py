@@ -123,13 +123,19 @@ def search(value,page=1):
 
 @app.get("/photo/<int:item_id>/chapter/<int:chapter>")
 def photo_list(item_id,chapter):
+    """腕上漫画 photoPath 接口。规范要求 title + images[].url，且 url 不预拼
+    width/quality/ifPNG/ifLVGL —— 快应用请求图片时自行追加。"""
     info = album_data(item_id)
     if not 1<=chapter<=len(info["episodes"]):
         raise ApiError(404,"Chapter not found")
-    photo_id = info["episodes"][chapter-1][0]
+    entry = info["episodes"][chapter-1]
+    photo_id = entry[0]
+    chapter_name = entry[1] if len(entry) > 1 else ""
     photo = photo_data(photo_id)
-    return jsonify(title=photo["name"],images=[{"url":public_url()+f"/photo/{photo_id}/{photo_id}_{page}.jpg"}
-        for page in range(1,len(photo["images"])+1)])
+    if not photo["images"]:
+        raise ApiError(404,"Chapter not found")
+    return jsonify(title=chapter_name or photo["name"],chapter=chapter,total_chapters=len(info["episodes"]),
+        images=[{"url":public_url()+f"/photo/{photo_id}/{page}"} for page in range(1,len(photo["images"])+1)])
 
 
 @app.get("/photo/<int:item_id>")
