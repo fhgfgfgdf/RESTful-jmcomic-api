@@ -12,6 +12,8 @@ from runtime import create_app, ApiError, public_url, memoize, download, serve
 
 app = create_app(__name__)
 
+UA = {"User-Agent": "Mozilla/5.0"}
+
 
 def client():
     options = {"client": {"impl": os.environ.get("JM_CLIENT", "api"),
@@ -49,7 +51,7 @@ def decoded_page(photo_id, page):
     if not 1 <= page <= len(info["images"]):
         raise ApiError(404,"Page not found")
     item = info["images"][page-1]
-    data = download(item["url"], {"User-Agent":"Mozilla/5.0"})
+    data = download(item["url"], UA)
     with Image.open(io.BytesIO(data)) as original:
         if original.width*original.height>int(os.environ.get("MAX_IMAGE_PIXELS","32000000")):
             raise ApiError(413,"原图超过像素预算")
@@ -96,7 +98,8 @@ def album(item_id):
 @app.get("/album/<int:item_id>/cover")
 def cover(item_id):
     domain = JmModuleConfig.DOMAIN_IMAGE_LIST[0]
-    return serve(["cover",item_id],lambda:download(f"https://{domain}/media/albums/{item_id}_3x4.jpg"),200)
+    # Upstream rejects requests without a browser-like UA (403), so send one here too.
+    return serve(["cover",item_id],lambda:download(f"https://{domain}/media/albums/{item_id}_3x4.jpg",UA),200)
 
 
 @memoize(60)
@@ -158,7 +161,7 @@ def legacy_proxy():
         return image(int(match[1]),match[2])
     if not url:
         raise ApiError(400,"缺少 url")
-    return serve(["proxy",url],lambda:download(url))
+    return serve(["proxy",url],lambda:download(url,UA))
 
 
 @app.errorhandler(Exception)
